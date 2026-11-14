@@ -4,9 +4,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -64,12 +67,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -100,6 +105,7 @@ import io.github.draumaz.twopane.ui.theme.LocalDarkTheme
 import io.github.draumaz.twopane.ui.theme.pageColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -190,10 +196,24 @@ fun ReaderScreen(
 
     val handoff = remember(turner) { HandoffSlot() }
 
+    // Jumps (and opening the book) land without a curl, so the page fades in instead of
+    // popping. It waits for the page to render, so a far jump doesn't fade in blank paper.
+    val landing = remember { Animatable(0f) }
+    var landings by remember { mutableIntStateOf(0) }
+    val landingCache by rememberUpdatedState(cache)
+    val landingAt by rememberUpdatedState(first)
+    LaunchedEffect(landings) {
+        landing.snapTo(0f)
+        snapshotFlow { landingCache?.get(landingAt) != null }.first { it }
+        landing.animateTo(1f, tween(180, easing = LinearOutSlowInEasing))
+    }
+
     fun jump(to: Int) {
         val p = pages ?: return
         turner?.cancel()
-        index = to.coerceIn(0, p.lastIndex)
+        val target = to.coerceIn(0, p.lastIndex)
+        if (target - target % perView != first) landings++
+        index = target
         anchor = p[index].start
     }
 
@@ -368,8 +388,12 @@ fun ReaderScreen(
                             c.save()
                             c.nativeCanvas.concat(io.github.draumaz.twopane.ui.hingeMatrix(angle, pivot, rect.height / 2f, hinge, density.density))
                         }
-                        if (bmp != null && !(turning && !current)) drawImage(bmp, Offset(rect.left.toFloat(), rect.top.toFloat()))
-                        else drawRect(colors.paper, Offset(rect.left.toFloat(), rect.top.toFloat()),
+                        val alpha = if (t != null || turning) 1f else landing.value
+                        if (bmp != null && !(turning && !current)) {
+                            if (alpha < 1f) drawRect(colors.paper, Offset(rect.left.toFloat(), rect.top.toFloat()),
+                                androidx.compose.ui.geometry.Size(rect.width.toFloat(), rect.height.toFloat()))
+                            drawImage(bmp, Offset(rect.left.toFloat(), rect.top.toFloat()), alpha = alpha)
+                        } else drawRect(colors.paper, Offset(rect.left.toFloat(), rect.top.toFloat()),
                             androidx.compose.ui.geometry.Size(rect.width.toFloat(), rect.height.toFloat()))
                         if (turning) {
                             // The page is in shadow until it comes round to face the light.
@@ -664,6 +688,9 @@ private fun Scrubber(first: Int, perView: Int, count: Int, chapterTitle: String?
     var value by remember { mutableFloatStateOf(first.toFloat()) }
     if (!dragging) value = first.toFloat()
     val shown = value.roundToInt()
+    val haptics = LocalHapticFeedback.current
+    // A fast fling crosses hundreds of pages: cap the ticks so it purrs rather than buzzes.
+    var lastTick by remember { mutableLongStateOf(0L) }
     Surface(
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -689,7 +716,15 @@ private fun Scrubber(first: Int, perView: Int, count: Int, chapterTitle: String?
                 value = value,
                 onValueChange = {
                     dragging = true
-                    value = (it.roundToInt() / perView * perView).toFloat()
+                    val snapped = (it.roundToInt() / perView * perView).toFloat()
+                    if (snapped != value) {
+                        val now = android.os.SystemClock.uptimeMillis()
+                        if (now - lastTick >= 30) {
+                            haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+                            lastTick = now
+                        }
+                    }
+                    value = snapped
                 },
                 onValueChangeFinished = {
                     dragging = false
