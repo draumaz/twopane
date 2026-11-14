@@ -46,3 +46,7 @@ Books can be added from the library, opened from a file manager, or pushed over 
 ## Fonts
 
 Google Sans Flex is under the SIL Open Font License (see `third_party/fonts`).
+
+## License
+
+Twopane is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
