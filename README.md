@@ -1,3 +1,5 @@
+![TwoPane, an e-reader for the Surface Duo and wide foldables](docs/social-preview.png)
+
 # TwoPane
 
 An e-reader for Android, written in Kotlin with Jetpack Compose and Material 3 Expressive.
