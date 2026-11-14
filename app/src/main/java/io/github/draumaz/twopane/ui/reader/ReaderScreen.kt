@@ -231,6 +231,17 @@ fun ReaderScreen(
             activity?.window?.let { WindowCompat.getInsetsController(it, it.decorView).show(WindowInsetsCompat.Type.systemBars()) }
         }
     }
+    // The bars sit over the paper, not the app theme: dark icons on light paper, light on dark.
+    val appDark = LocalDarkTheme.current
+    DisposableEffect(activity, colors.dark, appDark) {
+        val controller = activity?.window?.let { WindowCompat.getInsetsController(it, it.decorView) }
+        controller?.isAppearanceLightStatusBars = !colors.dark
+        controller?.isAppearanceLightNavigationBars = !colors.dark
+        onDispose {
+            controller?.isAppearanceLightStatusBars = !appDark
+            controller?.isAppearanceLightNavigationBars = !appDark
+        }
+    }
 
     BackHandler(panel != Panel.None) { panel = Panel.None }
 
