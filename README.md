@@ -4,6 +4,23 @@ An e-reader for Android, written in Kotlin with Jetpack Compose and Material 3 E
 It's built for the Surface Duo and other wide foldables: with the app spanned, a book opens
 across both screens and the hinge is the spine.
 
+![Moby-Dick open across both screens of a Surface Duo](docs/screenshots/reader-spread.webp)
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Library](docs/screenshots/library.webp) | ![Page curl across the hinge](docs/screenshots/page-curl.webp) |
+| Library, with the book you're reading up front | The page curl follows your finger across the hinge |
+| ![Sepia paper](docs/screenshots/reader-sepia.webp) | ![Text and page settings](docs/screenshots/text-and-page.webp) |
+| Sepia paper | Type size, typeface, line spacing, justification and paper |
+| ![Contents](docs/screenshots/contents.webp) | ![Settings](docs/screenshots/settings.webp) |
+| Contents and bookmarks | Settings |
+| ![Library on one screen](docs/screenshots/single-library.webp) | ![One page on one screen](docs/screenshots/single-reader.webp) |
+| On one screen, the library stacks | and the book shows a page at a time |
+
+Books shown are from [Project Gutenberg](https://www.gutenberg.org).
+
 ## Features
 
 - EPUB 2 and 3, and plain text (including Project Gutenberg files)
