@@ -59,6 +59,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -74,6 +75,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -127,8 +130,27 @@ fun ReaderScreen(
     val typesetter = remember(book, layoutSettings, pageSize, density) {
         Typesetter(book, layoutSettings, pageSize, density, fonts)
     }
-    var pages by remember(typesetter) { mutableStateOf<List<Page>?>(null) }
-    LaunchedEffect(typesetter) { pages = typesetter.paginate() }
+    // Pages from the last typesetting stay up while a new one runs, so a fold, a rotation or
+    // a font change never blanks the book; only the very first setting shows the indicator.
+    var pages by remember(book) { mutableStateOf<List<Page>?>(null) }
+    var pagesFor by remember(book) { mutableStateOf<Typesetter?>(null) }
+    // Every setting of the book is kept, by page size, density and type settings: folding and
+    // unfolding goes back and forth between two, and returning to one is instant.
+    val layouts = remember(book) { HashMap<List<Any>, List<Page>>() }
+    val layoutKey = listOf(layoutSettings, pageSize, density.density, density.fontScale)
+    val unfoldReady = io.github.draumaz.twopane.ui.LocalUnfoldReady.current
+    val current = pagesFor === typesetter
+    SideEffect { unfoldReady.value = current }
+    DisposableEffect(Unit) { onDispose { unfoldReady.value = true } }
+    LaunchedEffect(typesetter) {
+        val known = layouts[layoutKey]
+        if (known == null) {
+            if (pages != null) kotlinx.coroutines.delay(150) // the window may still be settling
+            layouts[layoutKey] = typesetter.paginate()
+        }
+        pages = layouts[layoutKey]
+        pagesFor = typesetter
+    }
 
     val colors = pageColors(settings.theme, LocalDarkTheme.current)
     val perView = if (frames.spread) 2 else 1
@@ -143,9 +165,19 @@ fun ReaderScreen(
     var panel by remember { mutableStateOf(Panel.None) }
 
     val sideOf: (Int) -> Side = { i -> if (!frames.spread) Side.Single else if (i % 2 == 0) Side.Left else Side.Right }
+    val previousCache = remember { arrayOfNulls<PageCache>(1) }
     val cache = pages?.let { p ->
-        remember(typesetter, p, colors, frames.spread) { PageCache(scope, typesetter, p, colors, sideOf) }
+        val setter = pagesFor ?: typesetter
+        remember(setter, p, colors, frames.spread) {
+            PageCache(scope, setter, p, colors, sideOf).also {
+                // Spanning re-renders every page (the gutter moves): until it has, show the old ones.
+                it.fallback = previousCache[0]?.also { old -> old.fallback = null }
+                previousCache[0] = it
+            }
+        }
     }
+    val unfold = io.github.draumaz.twopane.ui.LocalUnfold.current
+    val hinge = remember { android.graphics.Matrix() }
     val firstState = rememberUpdatedState(first)
     val turner = cache?.let { c ->
         remember(c, frames) {
@@ -312,11 +344,30 @@ fun ReaderScreen(
                     }
             ) {
                 val t = turner.turn
+                val opening = unfold()
                 fun page(i: Int, rect: androidx.compose.ui.unit.IntRect) {
                     val bmp = if (i in 0 until count) cache[i] else cache.blank
-                    if (bmp != null) drawImage(bmp, Offset(rect.left.toFloat(), rect.top.toFloat()))
-                    else drawRect(colors.paper, Offset(rect.left.toFloat(), rect.top.toFloat()),
-                        androidx.compose.ui.geometry.Size(rect.width.toFloat(), rect.height.toFloat()))
+                    val leftSide = frames.left != null && rect == frames.left
+                    val turning = frames.left != null && opening != 1f
+                    drawIntoCanvas { c ->
+                        if (turning) {
+                            // Unfolding: each page swings open on the spine.
+                            val angle = if (leftSide) io.github.draumaz.twopane.ui.unfoldStartAngle(opening) else io.github.draumaz.twopane.ui.unfoldEndAngle(opening)
+                            val pivot = if (leftSide) rect.right.toFloat() else rect.left.toFloat()
+                            c.save()
+                            c.nativeCanvas.concat(io.github.draumaz.twopane.ui.hingeMatrix(angle, pivot, rect.height / 2f, hinge, density.density))
+                        }
+                        if (bmp != null && !(turning && !current)) drawImage(bmp, Offset(rect.left.toFloat(), rect.top.toFloat()))
+                        else drawRect(colors.paper, Offset(rect.left.toFloat(), rect.top.toFloat()),
+                            androidx.compose.ui.geometry.Size(rect.width.toFloat(), rect.height.toFloat()))
+                        if (turning) {
+                            // The page is in shadow until it comes round to face the light.
+                            val shade = ((1f - opening) * (if (leftSide) 0.35f else 0.75f)).coerceIn(0f, 0.75f)
+                            drawRect(Color.Black.copy(alpha = shade), Offset(rect.left.toFloat(), rect.top.toFloat()),
+                                androidx.compose.ui.geometry.Size(rect.width.toFloat(), rect.height.toFloat()))
+                            c.restore()
+                        }
+                    }
                 }
                 val left = frames.left
                 if (left != null) {

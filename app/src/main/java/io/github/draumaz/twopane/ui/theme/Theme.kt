@@ -101,10 +101,10 @@ private fun Typography.withFamily(family: FontFamily): Typography {
 private val AppTypography = Typography().withFamily(GoogleSansFlex)
 
 @Composable
-fun TwoPaneTheme(darkTheme: Boolean, content: @Composable () -> Unit) {
+fun TwoPaneTheme(darkTheme: Boolean, dynamicColor: Boolean = true, content: @Composable () -> Unit) {
     val context = LocalContext.current
     val scheme = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         darkTheme -> DarkColors
         else -> LightColors

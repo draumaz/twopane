@@ -47,7 +47,10 @@ class PageCache(
         return typesetter.render(m, pages[i], i + 1, sideOf(i), colors)
     }
 
-    operator fun get(i: Int): ImageBitmap? = bitmaps[i]
+    /** The cache this one replaced, whose pages show until this one has drawn its own. */
+    var fallback: PageCache? = null
+
+    operator fun get(i: Int): ImageBitmap? = bitmaps[i] ?: fallback?.takeIf { it.pages === pages }?.bitmaps?.get(i)
 
     /** Starts rendering page [i] if it isn't already. Main thread only. */
     fun request(i: Int) {

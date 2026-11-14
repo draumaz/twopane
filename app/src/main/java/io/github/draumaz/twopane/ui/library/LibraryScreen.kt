@@ -93,6 +93,7 @@ fun LibraryScreen(
     onImport: (List<android.net.Uri>) -> Unit,
     onOpen: (String) -> Unit,
     onRemove: (String) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val split = LocalPaneSplit.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { onImport(it) }
@@ -112,10 +113,11 @@ fun LibraryScreen(
                 Column(
                     Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 28.dp, vertical = 24.dp),
                 ) {
-                    Hero()
-                    Spacer(Modifier.height(28.dp))
-                    if (current != null) ContinueCard(current, transition, onOpen)
-                    else Hint()
+                    Hero(onOpenSettings)
+                    if (current != null) {
+                        Spacer(Modifier.height(28.dp))
+                        ContinueCard(current, transition, onOpen)
+                    }
                 }
             }, end = {
                 Shelf(shelf, grid, seen, transition, header = {}, onOpen, onRemove, pick)
@@ -125,7 +127,7 @@ fun LibraryScreen(
         } else {
             Shelf(shelf, grid, seen, transition, header = {
                 Column(Modifier.padding(top = 8.dp, bottom = 8.dp)) {
-                    Hero()
+                    Hero(onOpenSettings)
                     if (current != null) {
                         Spacer(Modifier.height(24.dp))
                         ContinueCard(current, transition, onOpen)
@@ -139,8 +141,9 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun Hero() {
-    Column {
+private fun Hero(onOpenSettings: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+    Column(Modifier.weight(1f)) {
         Text(
             "TwoPane",
             style = MaterialTheme.typography.displayMediumEmphasized,
@@ -153,15 +156,8 @@ private fun Hero() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-}
-
-@Composable
-private fun Hint() {
-    Text(
-        "Open a book and it lies open across both screens, the hinge as its spine. Swipe a page to turn it.",
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    io.github.draumaz.twopane.ui.SettingsButton(onOpenSettings)
+    }
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)

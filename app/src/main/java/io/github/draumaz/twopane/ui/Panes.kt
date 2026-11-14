@@ -63,6 +63,9 @@ fun rememberPaneSplit(): PaneSplit? {
     val layoutInfo = layoutFlow?.collectAsStateWithLifecycle(initialValue = null)?.value
     val size = LocalWindowInfo.current.containerSize
     val density = LocalDensity.current
+    // The last hinge seen, and the window width it was seen at. Unfolding, the window widens a
+    // beat before the hinge is reported; until it is, a window that wide still has that hinge.
+    val known = remember { arrayOfNulls<Pair<Int, android.graphics.Rect>>(1) }
     return remember(layoutInfo, size, density) {
         with(density) {
             val width = size.width.toDp()
@@ -71,13 +74,16 @@ fun rememberPaneSplit(): PaneSplit? {
                 it.orientation == FoldingFeature.Orientation.VERTICAL &&
                     it.bounds.left.toDp() >= MinPaneWidth && width - it.bounds.right.toDp() >= MinPaneWidth
             }
+            if (fold != null) known[0] = size.width to fold.bounds
+            val bounds = fold?.bounds ?: known[0]?.takeIf { it.first == size.width }?.second
+            val hingeDevice = known[0] != null
             when {
-                fold != null && height >= MinSplitHeight -> {
-                    val start = fold.bounds.left.toDp()
-                    val gap = (fold.bounds.right - fold.bounds.left).toDp()
-                    PaneSplit(start, gap, width - start - gap, hinge = fold.isSeparating && gap > 0.dp)
+                bounds != null && height >= MinSplitHeight -> {
+                    val start = bounds.left.toDp()
+                    val gap = (bounds.right - bounds.left).toDp()
+                    PaneSplit(start, gap, width - start - gap, hinge = gap > 0.dp)
                 }
-                width >= ExpandedWidth && width > height * 1.15f && height >= MinSplitHeight -> {
+                !hingeDevice && width >= ExpandedWidth && width > height * 1.15f && height >= MinSplitHeight -> {
                     val start = width / 2
                     PaneSplit(start, 0.dp, width - start, hinge = false)
                 }
@@ -118,9 +124,10 @@ fun Panes(
     end: @Composable BoxScope.() -> Unit,
 ) {
     Row(modifier.fillMaxSize()) {
-        Box(Modifier.width(split.start).fillMaxHeight().padding(end = hingeGutter), content = start)
+        val unfold = LocalUnfold.current
+        Box(Modifier.width(split.start).fillMaxHeight().unfoldStart(unfold).padding(end = hingeGutter), content = start)
         Spacer(Modifier.width(split.gap))
-        Box(Modifier.weight(1f).fillMaxHeight().padding(start = hingeGutter), content = end)
+        Box(Modifier.weight(1f).fillMaxHeight().unfoldEnd(unfold).padding(start = hingeGutter), content = end)
     }
 }
 

@@ -51,12 +51,26 @@ class BookTransition(val shared: SharedTransitionScope, val visibility: androidx
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun AppRoot(vm: AppViewModel) {
+fun AppRoot(vm: AppViewModel, openExternal: (String) -> Unit) {
     val books by vm.books.collectAsStateWithLifecycle()
     val reading by vm.reading.collectAsStateWithLifecycle()
     val importing by vm.importing.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val split = rememberPaneSplit()
+
+    var settingsOpen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    // Settings shrink under the finger, then slide away.
+    var settingsBack by remember { mutableFloatStateOf(0f) }
+    PredictiveBackHandler(enabled = settingsOpen && reading == null) { events ->
+        try {
+            events.collect { settingsBack = it.progress }
+            settingsOpen = false
+        } catch (e: CancellationException) {
+            throw e
+        } finally {
+            settingsBack = 0f
+        }
+    }
 
     // Predictive back folds the book away under the finger, then closes it.
     var backProgress by remember { mutableFloatStateOf(0f) }
@@ -71,7 +85,11 @@ fun AppRoot(vm: AppViewModel) {
         }
     }
 
+    val unfoldReady = remember { androidx.compose.runtime.mutableStateOf(true) }
+    val unfold = rememberUnfold(split != null, unfoldReady)
     CompositionLocalProvider(
+        LocalUnfold provides unfold,
+        LocalUnfoldReady provides unfoldReady,
         LocalPaneSplit provides split,
         LocalLibrary provides vm.library,
         androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onSurface,
@@ -102,6 +120,7 @@ fun AppRoot(vm: AppViewModel) {
                         onImport = { vm.import(it) },
                         onOpen = vm::open,
                         onRemove = vm::remove,
+                        onOpenSettings = { settingsOpen = true },
                     )
                 } else {
                     val state = reading?.takeIf { it.id == id }
@@ -147,6 +166,29 @@ fun AppRoot(vm: AppViewModel) {
                         }
                     }
                 }
+            }
+
+            // On a spread, settings slide in over the shelf on the right screen.
+            androidx.compose.animation.AnimatedVisibility(
+                visible = settingsOpen && reading == null,
+                enter = androidx.compose.animation.slideInHorizontally(spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) { it } + fadeIn(),
+                exit = androidx.compose.animation.slideOutHorizontally(spring(stiffness = Spring.StiffnessMedium)) { it } + fadeOut(),
+                modifier = if (split != null) Modifier.padding(start = split.endOffset).unfoldEnd(unfold) else Modifier,
+            ) {
+                SettingsScreen(
+                    settings = vm.settingsStore,
+                    openExternal = openExternal,
+                    onBack = { settingsOpen = false },
+                    modifier = Modifier.graphicsLayer {
+                        val p = settingsBack
+                        val s = 1f - 0.1f * p
+                        scaleX = s
+                        scaleY = s
+                        translationX = p * 32.dp.toPx()
+                        shape = RoundedCornerShape(36.dp * p)
+                        clip = p > 0f
+                    },
+                )
             }
         }
     }

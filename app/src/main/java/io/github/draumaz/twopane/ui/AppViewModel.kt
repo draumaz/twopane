@@ -26,6 +26,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val twoPane = app as TwoPaneApp
     val library = twoPane.library
     val books: StateFlow<List<BookEntry>> = library.entries
+    val settingsStore = twoPane.settings
     val settings: StateFlow<ReaderSettings> = twoPane.settings.reader
 
     val reading = MutableStateFlow<Reading?>(null)
