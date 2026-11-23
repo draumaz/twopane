@@ -112,9 +112,16 @@ class Library(private val context: Context) {
         }
     }.getOrDefault(false)
 
-    fun parse(entry: BookEntry): Book = when (entry.format) {
-        BookFormat.Epub -> EpubParser.parse(bookFile(entry), entry.id)
-        BookFormat.Text -> TextParser.parse(bookFile(entry), entry.id, entry.title, entry.author)
+    fun parse(entry: BookEntry): Book {
+        val book = when (entry.format) {
+            BookFormat.Epub -> EpubParser.parse(bookFile(entry), entry.id)
+            BookFormat.Text -> TextParser.parse(bookFile(entry), entry.id, entry.title, entry.author)
+        }
+        if (book.chapters.all { it.blocks.isEmpty() }) {
+            book.close()
+            error("There's nothing in it to read.")
+        }
+        return book
     }
 
     suspend fun opened(id: String) = mutate { list -> list.map { if (it.id == id) it.copy(openedAt = System.currentTimeMillis()) else it } }

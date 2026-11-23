@@ -17,8 +17,8 @@ object TextParser {
         val bytes = file.readBytes()
         val utf8 = String(bytes, Charsets.UTF_8)
         // Not valid UTF-8 (replacement characters): older texts are usually Latin-1.
-        val text = if ('�' in utf8) String(bytes, Charsets.ISO_8859_1) else utf8
-        return text.removePrefix("﻿").replace("\r\n", "\n").replace('\r', '\n')
+        val text = if ('\uFFFD' in utf8) String(bytes, Charsets.ISO_8859_1) else utf8
+        return text.removePrefix("\uFEFF").replace("\r\n", "\n").replace('\r', '\n')
     }
 
     fun title(file: File): Pair<String, String?> {

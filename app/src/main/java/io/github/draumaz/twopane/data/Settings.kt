@@ -1,6 +1,7 @@
 package io.github.draumaz.twopane.data
 
 import android.content.Context
+import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,13 +44,13 @@ class SettingsStore(context: Context) {
     fun update(change: (ReaderSettings) -> ReaderSettings) {
         val s = change(_reader.value)
         _reader.value = s
-        prefs.edit()
-            .putFloat("fontSize", s.fontSize)
-            .putString("typeface", s.typeface.name)
-            .putFloat("lineSpacing", s.lineSpacing)
-            .putBoolean("justify", s.justify)
-            .putString("theme", s.theme.name)
-            .apply()
+        prefs.edit {
+            putFloat("fontSize", s.fontSize)
+            putString("typeface", s.typeface.name)
+            putFloat("lineSpacing", s.lineSpacing)
+            putBoolean("justify", s.justify)
+            putString("theme", s.theme.name)
+        }
     }
 
     private val _dynamicColor = MutableStateFlow(prefs.getBoolean("dynamicColor", true))
@@ -65,17 +66,17 @@ class SettingsStore(context: Context) {
 
     fun setDynamicColor(on: Boolean) {
         _dynamicColor.value = on
-        prefs.edit().putBoolean("dynamicColor", on).apply()
+        prefs.edit { putBoolean("dynamicColor", on) }
     }
 
     fun setThemeMode(mode: ThemeMode) {
         _themeMode.value = mode
-        prefs.edit().putString("themeMode", mode.name).apply()
+        prefs.edit { putString("themeMode", mode.name) }
     }
 
     fun setVolumeKeys(on: Boolean) {
         _volumeKeys.value = on
-        prefs.edit().putBoolean("volumeKeys", on).apply()
+        prefs.edit { putBoolean("volumeKeys", on) }
     }
 
     private inline fun <reified E : Enum<E>> enumOr(name: String?, default: E): E =

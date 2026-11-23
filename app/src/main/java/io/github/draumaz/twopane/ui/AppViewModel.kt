@@ -12,10 +12,12 @@ import io.github.draumaz.twopane.data.Position
 import io.github.draumaz.twopane.data.ReaderSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -55,8 +57,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         reading.value = Reading(id)
         opening = viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { runCatching { library.parse(entry) } }
-            result.onSuccess { parsed = it }
+            // Not cancellable, so a book opened just as the reader backs out is still closed.
+            val result = withContext(Dispatchers.IO + NonCancellable) { runCatching { library.parse(entry) } }
+            if (!isActive) {
+                result.getOrNull()?.close()
+                return@launch
+            }
+            result.onSuccess { book ->
+                parsed?.takeIf { it !== book }?.close()
+                parsed = book
+            }
             if (reading.value?.id == id) {
                 reading.value = result.fold({ Reading(id, it) }, { Reading(id, error = it.message ?: "Couldn't open this book") })
             }
@@ -90,7 +100,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun remove(id: String) {
         viewModelScope.launch {
-            if (parsed?.id == id) parsed = null
+            if (parsed?.id == id) {
+                parsed?.close()
+                parsed = null
+            }
             library.remove(id)
         }
     }
@@ -104,4 +117,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateSettings(change: (ReaderSettings) -> ReaderSettings) = twoPane.settings.update(change)
+
+    override fun onCleared() {
+        parsed?.close()
+        parsed = null
+    }
 }

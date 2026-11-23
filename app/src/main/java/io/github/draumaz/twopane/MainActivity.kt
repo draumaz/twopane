@@ -79,19 +79,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** The volume keys turn pages while a book is open. */
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val dir = when (event.keyCode) {
+    /** The page a key turns to while a book is open (1 forward, -1 back), or 0 if it doesn't turn pages. */
+    private fun turnFor(keyCode: Int): Int {
+        if (vm.reading.value == null || !(application as TwoPaneApp).settings.volumeKeys.value) return 0
+        return when (keyCode) {
             KeyEvent.KEYCODE_VOLUME_DOWN -> 1
             KeyEvent.KEYCODE_VOLUME_UP -> -1
             KeyEvent.KEYCODE_PAGE_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT -> 1
             KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_DPAD_LEFT -> -1
             else -> 0
         }
-        if (dir != 0 && vm.reading.value != null && (application as TwoPaneApp).settings.volumeKeys.value) {
-            if (event.action == KeyEvent.ACTION_DOWN) vm.pageKeys.tryEmit(dir)
-            return true
-        }
-        return super.dispatchKeyEvent(event)
     }
+
+    /** The volume keys turn pages while a book is open, instead of changing the volume. */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val dir = turnFor(keyCode)
+        if (dir == 0) return super.onKeyDown(keyCode, event)
+        vm.pageKeys.tryEmit(dir)
+        return true
+    }
+
+    // Swallowed too, or the volume key's release still plays the system's click.
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
+        turnFor(keyCode) != 0 || super.onKeyUp(keyCode, event)
 }

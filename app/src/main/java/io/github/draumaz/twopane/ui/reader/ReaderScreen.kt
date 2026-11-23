@@ -209,7 +209,7 @@ fun ReaderScreen(
     }
 
     fun jump(to: Int) {
-        val p = pages ?: return
+        val p = pages?.takeIf { it.isNotEmpty() } ?: return
         turner?.cancel()
         val target = to.coerceIn(0, p.lastIndex)
         if (target - target % perView != first) landings++
@@ -431,7 +431,8 @@ fun ReaderScreen(
                 onClose = onClose,
                 onJump = ::jump,
                 onPanel = { panel = if (panel == it) Panel.None else it },
-                onBookmark = {
+                onBookmark = bookmark@{
+                    if (first !in cache.pages.indices) return@bookmark
                     val existing = bookmarked
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                     onBookmarks(

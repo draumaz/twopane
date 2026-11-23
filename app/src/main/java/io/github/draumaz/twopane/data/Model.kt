@@ -1,5 +1,6 @@
 package io.github.draumaz.twopane.data
 
+import java.io.Closeable
 import java.io.InputStream
 
 /** What a block of a chapter is, which decides how it's typeset. */
@@ -52,7 +53,11 @@ class Book(
     val chapters: List<Chapter>,
     val toc: List<TocEntry>,
     val resources: BookResources = BookResources { null },
-)
+    /** Releases whatever [resources] reads from (an EPUB's open archive). */
+    private val onClose: () -> Unit = {},
+) : Closeable {
+    override fun close() = onClose()
+}
 
 /** A place in a book that survives repagination: a character in a block of a chapter. */
 data class Position(val chapter: Int, val block: Int, val char: Int) : Comparable<Position> {

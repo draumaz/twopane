@@ -57,8 +57,18 @@ object EpubParser {
         }?.value?.first
     }
 
+    /** The book stays open on [file] for its images: [Book.close] lets go of it. */
     fun parse(file: File, id: String): Book {
         val zip = ZipFile(file)
+        return try {
+            parse(zip, file, id)
+        } catch (e: Throwable) {
+            zip.close()
+            throw e
+        }
+    }
+
+    private fun parse(zip: ZipFile, file: File, id: String): Book {
         val pkg = readPackage(zip)
         val title = pkg.doc.allLocal("title").firstOrNull()?.text()?.trim().orEmpty().ifBlank { file.nameWithoutExtension }
         val author = pkg.doc.allLocal("creator").firstOrNull()?.text()?.trim()?.ifBlank { null }
@@ -110,9 +120,11 @@ object EpubParser {
         }
 
         val names = zip.entries().asSequence().map { it.name }.toSet()
-        return Book(id, title, author, chapters, toc) { path ->
-            if (path in names) zip.getEntry(path)?.let { zip.getInputStream(it) } else null
+        val resources = BookResources { path ->
+            // Null once the book is closed: a page still rendering as the reader goes away gets no image.
+            if (path in names) runCatching { zip.getEntry(path)?.let { zip.getInputStream(it) } }.getOrNull() else null
         }
+        return Book(id, title, author, chapters, toc, resources, onClose = zip::close)
     }
 
     /** (label, href resolved against the archive root, depth) from the EPUB 3 nav or the EPUB 2 NCX. */

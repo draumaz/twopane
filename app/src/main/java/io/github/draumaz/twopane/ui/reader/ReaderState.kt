@@ -22,7 +22,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.PI
-import kotlin.math.abs
 import kotlin.math.sin
 
 /**
@@ -221,7 +220,4 @@ class PageTurner(
     }
 
     val busy: Boolean get() = turn != null
-
-    @Suppress("unused")
-    private fun near(a: Float, b: Float) = abs(a - b) < 0.5f
 }

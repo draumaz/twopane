@@ -46,6 +46,7 @@ import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -211,7 +212,7 @@ private fun Empty(text: String) = Text(
 @Composable
 fun AppearancePanel(settings: ReaderSettings, onChange: ((ReaderSettings) -> ReaderSettings) -> Unit) {
     // Font size applies on release: every change repaginates the whole book.
-    var size by remember(settings.fontSize) { mutableStateOf(settings.fontSize) }
+    var size by remember(settings.fontSize) { mutableFloatStateOf(settings.fontSize) }
     Column(
         Modifier
             .fillMaxSize()

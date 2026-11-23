@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.createBitmap
 import io.github.draumaz.twopane.ui.PageFrames
 import kotlin.math.PI
 import kotlin.math.abs
@@ -262,13 +264,9 @@ fun DrawScope.drawTurn(t: Turn, frames: PageFrames, shadowDark: Boolean) {
 
 /** A single page's reverse: its face, faint through the paper. */
 fun fadedReverse(face: ImageBitmap, paper: Color): ImageBitmap {
-    val bmp = android.graphics.Bitmap.createBitmap(face.width, face.height, android.graphics.Bitmap.Config.ARGB_8888)
+    val bmp = createBitmap(face.width, face.height)
     val c = NativeCanvas(bmp)
-    c.drawColor(paper.toArgbInt())
+    c.drawColor(paper.toArgb())
     c.drawBitmap(face.asAndroidBitmap(), 0f, 0f, Paint().apply { alpha = 40 })
     return bmp.asImageBitmap()
 }
-
-private fun Color.toArgbInt(): Int = android.graphics.Color.argb(
-    (alpha * 255).toInt(), (red * 255).toInt(), (green * 255).toInt(), (blue * 255).toInt(),
-)
